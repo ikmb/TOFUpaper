@@ -1,0 +1,11 @@
+/dpool/ewacker/metagenomics/nextflow run /dpool/ewacker/metagenomics/TOFU-MAaPO/TOFU-MAaPO \
+    --sra "SRP102150" \
+    --assembly \
+    --publish_rawbins \
+    --publish_megahit \
+    -profile biomedinf \
+    --apikey ${NCBI_API_KEY} \
+    --genome human \
+    --outdir SRP102150 \
+    -work-dir work_SRP102150 \
+    -c "/dpool/ewacker/metagenomics/TOFU-MAaPO/SRP102150/tofu.config"

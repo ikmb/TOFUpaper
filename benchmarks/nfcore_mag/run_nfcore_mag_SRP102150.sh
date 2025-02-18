@@ -1,0 +1,14 @@
+/dpool/ewacker/metagenomics/nextflow run nf-core/mag \
+    -profile singularity \
+    --input /dpool/ewacker/metagenomics/nfcore_mag/sample_list_raw_nfcore.csv \
+    --outdir SRP102150 \
+    --host_genome GRCh38 \
+    --binqc_tool checkm \
+    --refine_bins_dastool \
+    --skip_prokka \
+    --postbinning_input refined_bins_only \
+    --skip_spades \
+    --skip_prodigal \
+    --skip_metaeuk \
+    -c custom.config \
+    -resume
