@@ -216,8 +216,8 @@ plot_magbenchmark <- plot_grid(
 
 plot_magbenchmark
 
-ggsave(filename="SRP102150/arranged_benchmark_100samples_v2.svg",plot_magbenchmark, width=12, height = 6, bg = "white" )               
-ggsave(filename="SRP102150/arranged_benchmark_100samples_v2.jpg",plot_magbenchmark, width=12, height = 6, bg = "white" )  
+ggsave(filename="assembly_benchmarks/arranged_benchmark_100samples_v2.svg",plot_magbenchmark, width=12, height = 6, bg = "white" )               
+ggsave(filename="assembly_benchmarks/arranged_benchmark_100samples_v2.jpg",plot_magbenchmark, width=12, height = 6, bg = "white" )  
 
 
 # Return Bins per Pipeline table:
