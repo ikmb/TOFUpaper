@@ -5,12 +5,22 @@ library(RColorBrewer)
 library(lubridate)
 library(ggpattern)
 library(cowplot)
-comparison_sample_ids <- list.files(path="/run/user/1000/gvfs/sftp:host=medcluster.medfdm.uni-kiel.de/work_beegfs/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/TOFU-MAaPO/SRP102150/SRP102150/maxbin2",include.dirs = T) 
+
+
+if (Sys.info()[["nodename"]] == "ukshikmb-nl056") {
+  dir_to_cluster <- "/run/user/1000/gvfs/sftp:host=caucluster.rz.uni-kiel.de,user=sukmb465/"
+} else if (Sys.info()[["nodename"]] == "MBP-von-ewacker.i-kmb.de") {
+  dir_to_cluster <- "~/caucluster_mount/"
+} else {
+  dir_to_cluster <- "~/caucluster_mount/"
+}
+
+comparison_sample_ids <- list.files(path=paste0(dir_to_cluster,"work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/TOFU-MAaPO/SRP102150/SRP102150/maxbin2"),include.dirs = T) 
 
 # Bin Scoring Plot: ####
 checkm_paths <- vector()
 for(i in seq(1:length(comparison_sample_ids))){
-  checkm_paths[i] <- (paste0("/run/user/1000/gvfs/sftp:host=medcluster.medfdm.uni-kiel.de/work_beegfs/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/TOFU-MAaPO/SRP102150/SRP102150/checkm/",comparison_sample_ids[i],"/",comparison_sample_ids[i],"_checkm_table.tsv"))
+  checkm_paths[i] <- (paste0(dir_to_cluster,"/work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/TOFU-MAaPO/SRP102150/SRP102150/checkm/",comparison_sample_ids[i],"/",comparison_sample_ids[i],"_checkm_table.tsv"))
 }
 
 checkm_tables <- sapply(checkm_paths, function(x) fread(x, sep = "\t", header = T) , simplify=F)  %>% rbindlist(use.names = T, idcol="Filename") %>% 
@@ -24,14 +34,21 @@ checkm_tables <- sapply(checkm_paths, function(x) fread(x, sep = "\t", header = 
 nfmag_path <- vector()
 nfmag_path_unbinned <- vector()
 
-nfmag_tables <- fread("/run/user/1000/gvfs/sftp:host=medcluster.medfdm.uni-kiel.de/work_beegfs/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/nfcore_mag/checkm_postprocessing/nfcore_mag_checkm_table.tsv", sep = "\t", header=T) %>%
+nfmag_tables <- fread(paste0(dir_to_cluster,"/work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/nfcore_mag/checkm_postprocessing/nfcore_mag_checkm_table.tsv"), sep = "\t", header=T) %>%
   mutate(SampleID=gsub("MEGAHIT-.*-","",`Bin Id`) %>% gsub("\\..*$","",.)) %>% 
   mutate(score=Completeness - 0.5*(Contamination) ) %>%
   arrange(-score) %>%
   mutate(bin_rank = row_number()) 
 
 
-atlas_table <- fread("/run/user/1000/gvfs/sftp:host=medcluster.medfdm.uni-kiel.de/work_beegfs/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/ATLAS/batch1batch2_postprocessing/atlas_checkm_table.tsv") %>%
+atlas_table <- fread(paste0(dir_to_cluster,"/work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/ATLAS/batch1batch2_postprocessing/atlas_checkm_table.tsv")) %>%
+  mutate(score=Completeness - 0.5*(Contamination) ) %>%
+  arrange(-score) %>%
+  mutate(SampleID=gsub("_.*$","",`Bin Id`)) %>%
+  mutate(bin_rank = row_number())
+
+
+metafun_table <- fread(paste0(dir_to_cluster,"/work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/metafun/results/metagenome/bin_results/metafun_checkm_table.tsv"))  %>% 
   mutate(score=Completeness - 0.5*(Contamination) ) %>%
   arrange(-score) %>%
   mutate(SampleID=gsub("_.*$","",`Bin Id`)) %>%
@@ -40,26 +57,33 @@ atlas_table <- fread("/run/user/1000/gvfs/sftp:host=medcluster.medfdm.uni-kiel.d
 
 color_df <- data.frame(labels=c("TOFU-MAaPO",
                                 "nf-core/mag",
-                                "ATLAS"
+                                "ATLAS",
+                                "metaFun"
                                 ), 
                        values=c("#BEAED4",
                                 "#7FC97F",
-                                "#FDC086")
+                                "#FDC086",
+                                "#386CB0"
+                                #brewer.pal(5, "Accent")
+                                )
 )
 
 tofu_nfcore_comparison <- list(tofumaapo=checkm_tables,
                                nfmag=nfmag_tables,
-                               atlas=atlas_table#,
+                               atlas=atlas_table,
+                               metaFun=metafun_table
 ) %>% 
   rbindlist(use.names =T, idcol="origin" ) %>%
   mutate(origin=gsub("tofumaapo","TOFU-MAaPO",origin),
          origin=gsub("nfmag","nf-core/mag",origin),
          origin=gsub("atlas","ATLAS",origin),
+         origin=gsub("metafun","metaFun",origin),
          origin=factor(origin, 
                        levels=(c(
                          "TOFU-MAaPO",
                          "nf-core/mag",
-                         "ATLAS")
+                         "ATLAS",
+                         "metaFun")
                        ))) %>%
   #filter out negative scores
   filter(score>0)%>%
@@ -102,37 +126,45 @@ tofu_nfcore_comparison
 
 
 #### NFCORE needs the second run added to it!!!! ####
-runtime_nfcore <- system(command = "grep \"Runtime: \" /run/user/1000/gvfs/sftp:host=medcluster.medfdm.uni-kiel.de/work_beegfs/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/nfcore_mag/cmdbench.log_firstrun", intern=T) %>% 
+runtime_nfcore <- system(command = paste0("grep \"Runtime: \" ",dir_to_cluster,"/work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/nfcore_mag/cmdbench.log_firstrun"), intern=T) %>% 
     gsub("Runtime: ","",.) %>% gsub(" second\\(s\\)","",.) %>% 
     trimws() %>% 
     as.double() +
-  system(command = "grep \"Runtime: \" /run/user/1000/gvfs/sftp:host=medcluster.medfdm.uni-kiel.de/work_beegfs/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/nfcore_mag/cmdbench.log", intern=T) %>%
+  system(command = paste0("grep \"Runtime: \" ",dir_to_cluster,"/work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/nfcore_mag/cmdbench.log"), intern=T) %>%
     gsub("Runtime: ","",.) %>% 
     gsub(" second\\(s\\)","",.) %>% 
     trimws() %>% 
     as.double()
 
-runtime_tofu <- system(command = "grep \"Runtime: \" /run/user/1000/gvfs/sftp:host=medcluster.medfdm.uni-kiel.de/work_beegfs/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/TOFU-MAaPO/SRP102150/cmdbench_fivebinners.log", intern=T) %>% 
+runtime_tofu <- system(command =paste0("grep \"Runtime: \" ",dir_to_cluster,"/work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/TOFU-MAaPO/SRP102150/cmdbench_fivebinners.log"), intern=T) %>% 
   gsub("Runtime: ","",.) %>% gsub(" second\\(s\\)","",.) %>% trimws() %>% as.double()
-runtime_atlas <- system(command = "grep \"Runtime: \" /run/user/1000/gvfs/sftp:host=medcluster.medfdm.uni-kiel.de/work_beegfs/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/ATLAS/batch1/cmdbench.log", intern=T) %>% 
+runtime_atlas <- system(command = paste0("grep \"Runtime: \" ",dir_to_cluster,"/work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/ATLAS/batch1/cmdbench.log"), intern=T) %>% 
   gsub("Runtime: ","",.) %>% gsub(" second\\(s\\)","",.) %>% trimws() %>% as.double()+
-  system(command = "grep \"Runtime: \" /run/user/1000/gvfs/sftp:host=medcluster.medfdm.uni-kiel.de/work_beegfs/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/ATLAS/batch2/cmdbench_firstrun.log", intern=T) %>% 
+  system(command = paste0("grep \"Runtime: \" ",dir_to_cluster,"/work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/ATLAS/batch2/cmdbench_firstrun.log"), intern=T) %>% 
   gsub("Runtime: ","",.) %>% gsub(" second\\(s\\)","",.) %>% trimws() %>% as.double()+
-  system(command = "grep \"Runtime: \" /run/user/1000/gvfs/sftp:host=medcluster.medfdm.uni-kiel.de/work_beegfs/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/ATLAS/batch2/cmdbench_secondrun.log", intern=T) %>% 
+  system(command = paste0("grep \"Runtime: \" ",dir_to_cluster,"/work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/ATLAS/batch2/cmdbench_secondrun.log"), intern=T) %>% 
   gsub("Runtime: ","",.) %>% gsub(" second\\(s\\)","",.) %>% trimws() %>% as.double()
 # runtime_atlas_cobinning <- system(command = "grep \"Runtime: \" /run/user/1000/gvfs/sftp:host=134.245.63.226,user=ewacker/dpool/ewacker/metagenomics/sra_SRP102150_100samples/atlas_cobinning/cmdbench.log", intern=T) %>% gsub("Runtime: ","",.) %>% gsub(" second\\(s\\)","",.) %>% trimws() %>% as.double()
 
 
+runtime_metafun <- system(command =paste0("grep \"Runtime: \" ",dir_to_cluster,"work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/metafun/cmdbench_metafun.log"), intern=T) %>% 
+  gsub("Runtime: ","",.) %>% gsub(" second\\(s\\)","",.) %>% trimws() %>% as.double()+
+  system(command =paste0("grep \"Runtime: \" ",dir_to_cluster,"/work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/metafun/cmdbench_metafun2.log"), intern=T) %>% 
+  gsub("Runtime: ","",.) %>% gsub(" second\\(s\\)","",.) %>% trimws() %>% as.double()
+
 runtimes <- data.frame(Tool=factor(c("tofumaapo",
                                      "nfcore_mag",
-                                     "runtime_atlas"
+                                     "runtime_atlas",
+                                     "metafun"
                                      ),
                                    level=c("tofumaapo",
                                            "nfcore_mag",
-                                           "runtime_atlas")),#[c(2,1,5,4,3)]),
+                                           "runtime_atlas",
+                                           "metafun")),#[c(2,1,5,4,3)]),
                        Runtime=c(lubridate::as.duration(runtime_tofu),
                                  lubridate::as.duration(runtime_nfcore),
-                                 lubridate::as.duration(runtime_atlas)))
+                                 lubridate::as.duration(runtime_atlas),
+                                 lubridate::as.duration(runtime_metafun)))
 
 
 runtime_plot <- ggplot(runtimes, aes(x=Tool, y=Runtime %>% as.numeric("hours"), pattern=Tool, fill=Tool))+
@@ -140,7 +172,8 @@ runtime_plot <- ggplot(runtimes, aes(x=Tool, y=Runtime %>% as.numeric("hours"), 
   scale_fill_manual(values = color_df$values)+#[c(3,2,1,4,5)]) +
   scale_pattern_manual(values = c(nfcore_mag = "none", 
                                   tofumaapo = "none", 
-                                  runtime_atlas="none"))+
+                                  runtime_atlas="none",
+                                  metafun="none"))+
   coord_cartesian(ylim = c(-2, 505), expand = F) +
   geom_text(aes(label=Runtime %>% as.numeric("hours") %>% round(digits=2), size=24),position = position_dodge(width = 0.8), vjust = -0.6, size=8)+
   xlab("") + 
@@ -152,10 +185,12 @@ runtime_plot <- ggplot(runtimes, aes(x=Tool, y=Runtime %>% as.numeric("hours"), 
         axis.text.x = element_text(color="black", size=18, angle = 90, hjust = 0.5, vjust = 0.5))+
   scale_x_discrete(breaks = c("nfcore_mag", 
                               "tofumaapo",
-                              "runtime_atlas"), 
+                              "runtime_atlas",
+                              "metafun"), 
                    label = c("nf-core/mag",
                              "TOFU-MAaPO",
-                             "ATLAS"
+                             "ATLAS",
+                             "metaFun"
                    ), position = "bottom")
 
 runtime_plot
@@ -181,24 +216,27 @@ plot_magbenchmark <- plot_grid(
 
 plot_magbenchmark
 
-ggsave(filename="SRP102150/arranged_benchmark_100samples.svg",plot_magbenchmark, width=12, height = 6, bg = "white" )               
-ggsave(filename="SRP102150/arranged_benchmark_100samples.jpg",plot_magbenchmark, width=12, height = 6, bg = "white" )  
+ggsave(filename="SRP102150/arranged_benchmark_100samples_v2.svg",plot_magbenchmark, width=12, height = 6, bg = "white" )               
+ggsave(filename="SRP102150/arranged_benchmark_100samples_v2.jpg",plot_magbenchmark, width=12, height = 6, bg = "white" )  
 
 
 # Return Bins per Pipeline table:
 list(tofumaapo=checkm_tables,
            nfmag=nfmag_tables,
-           atlas=atlas_table#,
+           atlas=atlas_table,
+           metafun=metafun_table
       ) %>% 
       rbindlist(use.names =T, idcol="origin" ) %>%
        mutate(origin=gsub("tofumaapo","TOFU-MAaPO",origin),
-                             origin=gsub("nfmag","nf-core/mag",origin),
-                         origin=gsub("atlas","ATLAS",origin),
+              origin=gsub("nfmag","nf-core/mag",origin),
+              origin=gsub("atlas","ATLAS",origin),
+              origin=gsub("metafun","metaFun",origin),
                              origin=factor(origin, 
                                           levels=(c(
                                                 "TOFU-MAaPO",
                                                   "nf-core/mag",
-                                                "ATLAS")
+                                                "ATLAS",
+                                                "metaFun")
                                             ))) %>%
        filter(score>0) %>% #filter out negative scores
   group_by(origin) %>% 
