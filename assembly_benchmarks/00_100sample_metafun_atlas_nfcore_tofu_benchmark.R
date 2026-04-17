@@ -15,12 +15,12 @@ if (Sys.info()[["nodename"]] == "ukshikmb-nl056") {
   dir_to_cluster <- "~/caucluster_mount/"
 }
 
-comparison_sample_ids <- list.files(path=paste0(dir_to_cluster,"work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/TOFU-MAaPO/SRP102150/SRP102150/maxbin2"),include.dirs = T) 
+comparison_sample_ids <- list.files(path=paste0(dir_to_cluster,"work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/TOFUDEV160/maxbin2"),include.dirs = T) 
 
 # Bin Scoring Plot: ####
 checkm_paths <- vector()
 for(i in seq(1:length(comparison_sample_ids))){
-  checkm_paths[i] <- (paste0(dir_to_cluster,"/work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/TOFU-MAaPO/SRP102150/SRP102150/checkm/",comparison_sample_ids[i],"/",comparison_sample_ids[i],"_checkm_table.tsv"))
+  checkm_paths[i] <- (paste0(dir_to_cluster,"work_ikmb/sukmb465/projects/TOFUpaper/benchmarks/metagenomics/TOFUDEV160/checkm/",comparison_sample_ids[i],"/",comparison_sample_ids[i],"_checkm_table.tsv"))
 }
 
 checkm_tables <- sapply(checkm_paths, function(x) fread(x, sep = "\t", header = T) , simplify=F)  %>% rbindlist(use.names = T, idcol="Filename") %>% 
@@ -240,5 +240,6 @@ list(tofumaapo=checkm_tables,
                                             ))) %>%
        filter(score>0) %>% #filter out negative scores
   group_by(origin) %>% 
-  filter(score>0.5) %>%   #check for only medium and high quality bins
+  # filter(score>0.5) %>%   #check for only medium and high quality bins
   summarise(binspertool=n())
+
