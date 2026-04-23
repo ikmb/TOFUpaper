@@ -1,6 +1,8 @@
 # TOFUpaper
 Scripts used in the TOFU-MAaPO paper
 
+You can find the repository for the pipeline [here](https://github.com/ikmb/TOFU-MAaPO). 
+
 ## Repository Overview
 
 ### Directories 
